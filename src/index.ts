@@ -23,6 +23,7 @@ import {
   securityRateLimitMiddleware,
 } from './security/abuse-monitor.js'
 import { initializeDatabase } from './db/database.js'
+import { etlWorker } from './services/etlWorker.js'
 
 const PORT = process.env.PORT ?? 3000
 const jobSystem = new BackgroundJobSystem()
@@ -52,9 +53,14 @@ app.use('/api/verifications', verificationsRouter)
 app.use('/api/api-keys', apiKeysRouter)
 app.use('/api/notifications', notificationsRouter)
 
+const ETL_INTERVAL_MINUTES = parseInt(process.env.ETL_INTERVAL_MINUTES ?? '5', 10)
+
 const server = app.listen(PORT, () => {
   console.log(`Disciplr API listening on http://localhost:${PORT}`)
   startExpirationChecker()
+  if (process.env.ENABLE_ETL_WORKER !== 'false') {
+    etlWorker.start(ETL_INTERVAL_MINUTES)
+  }
 })
 
 let shuttingDown = false
@@ -68,6 +74,7 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   console.log(`Received ${signal}. Shutting down gracefully...`)
 
   try {
+    await etlWorker.stop()
     await jobSystem.stop()
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {

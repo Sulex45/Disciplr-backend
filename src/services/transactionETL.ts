@@ -1,34 +1,42 @@
-import { Horizon, Server } from '@stellar/stellar-sdk'
+import { Horizon } from '@stellar/stellar-sdk'
 import type { Transaction, HorizonOperation, ETLConfig, VaultReference } from '../types/transactions.js'
 import { db } from '../db/index.js'
 
 export class TransactionETLService {
-  private server: Server
+  private server: Horizon.Server
   private config: ETLConfig
   private readonly STELLAR_EXPLORER_BASE = 'https://stellar.expert/explorer/public/tx'
 
   constructor(config: ETLConfig) {
     this.config = config
-    this.server = new Server(config.horizonUrl)
+    this.server = new Horizon.Server(config.horizonUrl)
   }
 
   /**
-   * Run the full ETL process - backfill and incremental sync
+   * Run the full ETL process - backfill and incremental sync.
+   * Pass an AbortSignal to allow the caller to cancel a long-running run.
    */
-  async runETL(): Promise<void> {
+  async runETL(signal?: AbortSignal): Promise<void> {
+    TransactionETLService.checkAbort(signal)
     console.log('Starting Transaction ETL process...')
-    
+
     try {
       // Run backfill if configured
       if (this.config.backfillFrom) {
-        await this.backfillHistoricalTransactions()
+        await this.backfillHistoricalTransactions(signal)
       }
-      
+
+      TransactionETLService.checkAbort(signal)
+
       // Run incremental sync
-      await this.incrementalSync()
-      
+      await this.incrementalSync(signal)
+
       console.log('ETL process completed successfully')
     } catch (error) {
+      if (TransactionETLService.isAbortError(error)) {
+        console.log('ETL process aborted')
+        throw error
+      }
       console.error('ETL process failed:', error)
       throw error
     }
@@ -37,16 +45,17 @@ export class TransactionETLService {
   /**
    * Backfill historical transactions from a date range
    */
-  async backfillHistoricalTransactions(): Promise<void> {
+  async backfillHistoricalTransactions(signal?: AbortSignal): Promise<void> {
     console.log(`Starting backfill from ${this.config.backfillFrom} to ${this.config.backfillTo}`)
-    
+
     const from = this.config.backfillFrom!
     const to = this.config.backfillTo || new Date()
-    
+
     // Get all vaults for the period
     const vaults = await this.getVaultsInDateRange(from, to)
-    
+
     for (const vault of vaults) {
+      TransactionETLService.checkAbort(signal)
       await this.processVaultTransactions(vault, from, to)
     }
   }
@@ -54,35 +63,40 @@ export class TransactionETLService {
   /**
    * Incremental sync using cursor-based pagination
    */
-  async incrementalSync(): Promise<void> {
+  async incrementalSync(signal?: AbortSignal): Promise<void> {
     console.log('Starting incremental sync...')
-    
+
     let cursor = this.config.cursor || await this.getLastProcessedCursor()
     let hasMore = true
     let processedCount = 0
-    
+
     while (hasMore && processedCount < this.config.batchSize) {
+      TransactionETLService.checkAbort(signal)
+
       try {
         const operations = await this.fetchHorizonOperations(cursor)
-        
+
         if (operations.length === 0) {
           hasMore = false
           break
         }
-        
+
         const vaultTransactions = await this.filterAndTransformOperations(operations)
-        
+
         if (vaultTransactions.length > 0) {
           await this.saveTransactions(vaultTransactions)
         }
-        
+
         // Update cursor to the last operation's ID
         cursor = operations[operations.length - 1].id
         processedCount += operations.length
-        
+
         console.log(`Processed ${processedCount} operations...`)
-        
+
       } catch (error) {
+        if (TransactionETLService.isAbortError(error)) {
+          throw error
+        }
         console.error(`Error processing batch at cursor ${cursor}:`, error)
         break
       }
@@ -214,7 +228,7 @@ export class TransactionETLService {
         tx_hash: operation.transaction_hash,
         type,
         amount: operation.amount || '0',
-        asset_code: operation.asset_code || (operation.asset_type === 'native' ? null : operation.asset_code),
+        asset_code: operation.asset_type === 'native' ? null : (operation.asset_code ?? null),
         from_account: operation.from || operation.source_account,
         to_account: operation.to || vault.success_destination,
         memo: operation.memo || null,
@@ -332,6 +346,22 @@ export class TransactionETLService {
     // Save cursor for next incremental sync
     console.log(`Saving cursor: ${cursor}`)
     // TODO: Implement cursor persistence
+  }
+
+  // ---------------------------------------------------------------------------
+  // Abort helpers
+  // ---------------------------------------------------------------------------
+
+  private static checkAbort(signal?: AbortSignal): void {
+    if (signal?.aborted === true) {
+      const err = new Error('ETL run aborted')
+      err.name = 'AbortError'
+      throw err
+    }
+  }
+
+  static isAbortError(error: unknown): boolean {
+    return error instanceof Error && error.name === 'AbortError'
   }
 
   private async processVaultTransactions(vault: VaultReference, from: Date, to: Date): Promise<void> {
