@@ -5,6 +5,7 @@ export interface Notification {
   title: string
   message: string
   data?: any
+  idempotency_key: string | null
   read_at: string | null
   created_at: string
 }
@@ -15,4 +16,5 @@ export interface CreateNotificationInput {
   title: string
   message: string
   data?: any
+  idempotency_key?: string
 }
