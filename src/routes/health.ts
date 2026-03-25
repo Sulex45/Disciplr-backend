@@ -1,7 +1,6 @@
 import { Router } from 'express'
 import { BackgroundJobSystem } from '../jobs/system.js'
 import { startExpirationChecker } from '../services/expirationScheduler.js'
-import { horizonListenerConfig } from '../config/horizonListener.js'
 
 export const createHealthRouter = (jobSystem: BackgroundJobSystem) => {
   const router = Router()
