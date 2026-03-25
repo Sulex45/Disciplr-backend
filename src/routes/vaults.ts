@@ -153,7 +153,7 @@ vaultsRouter.get('/:id', authenticate, async (req: Request, res: Response) => {
     return
     const responseBody = {
       vault,
-      onChain: buildVaultCreationPayload(input, vault),
+      onChain: await buildVaultCreationPayload(input, vault),
       idempotency: { key: idempotencyKey, replayed: false },
     }
 
