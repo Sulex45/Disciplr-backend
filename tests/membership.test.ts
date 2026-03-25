@@ -23,8 +23,7 @@ import {
 } from '../src/models/organizations.js'
 import { orgMembersRouter } from '../src/routes/orgMembers.js'
 
-// ─── Test app setup ───────────────────────────────────────────────────────────
-
+// Test app setup 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'change-me-in-production'
 
 /** Minimal authenticate shim – mirrors auth.ts without DB/session overhead. */
@@ -154,13 +153,11 @@ testRouter.patch(
 
 testApp.use('/api/organizations', testRouter)
 
-// ─── Token helper ─────────────────────────────────────────────────────────────
-
+// Token helper
 const tok = (sub: string) =>
   `Bearer ${jwt.sign({ sub, userId: sub }, JWT_SECRET, { expiresIn: '1h' })}`
 
-// ─── Seed helpers ─────────────────────────────────────────────────────────────
-
+// Seed helpers
 const ORG = 'org-alpha'
 const OTHER_ORG = 'org-beta'
 
@@ -184,9 +181,7 @@ afterEach(() => {
   setOrgMembers([])
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Unit tests – in-memory model
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('countOrgAdmins()', () => {
   it('counts owner + admin roles', () => {
@@ -298,9 +293,7 @@ describe('updateOrgMemberRole()', () => {
   })
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Integration tests – HTTP endpoints
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('GET /api/organizations/:orgId/members', () => {
   it('returns 401 without auth', async () => {
@@ -540,8 +533,7 @@ describe('PATCH /api/organizations/:orgId/members/:userId/role', () => {
   })
 })
 
-// ─── Edge case: single-member org ────────────────────────────────────────────
-
+// Edge case: single-member org
 describe('Single-member org edge cases', () => {
   beforeEach(() => {
     setOrganizations([{ id: 'solo-org', name: 'Solo', createdAt: '2025-01-01T00:00:00Z' }])

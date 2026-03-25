@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { BackgroundJobSystem } from '../jobs/system.js'
 import { startExpirationChecker } from '../services/expirationScheduler.js'
-import { horizonListenerConfig } from '../config/horizonListener.js'
+// import { horizonListenerConfig } from '../config/horizonListener.js'
 
 export const createHealthRouter = (jobSystem: BackgroundJobSystem) => {
   const router = Router()
@@ -12,7 +12,7 @@ export const createHealthRouter = (jobSystem: BackgroundJobSystem) => {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       jobs: jobSystem.getMetrics()
-      jobs: jobSystem.getUptimeMetrics()
+      // jobs: jobSystem.getUptimeMetrics()
     })
   })
 
