@@ -13,6 +13,7 @@ import { milestonesRouter } from './routes/milestones.js'
 import { startExpirationChecker } from './services/expirationScheduler.js'
 import { orgVaultsRouter } from './routes/orgVaults.js'
 import { orgAnalyticsRouter } from './routes/orgAnalytics.js'
+import { orgMembersRouter } from './routes/orgMembers.js'
 import { adminRouter } from './routes/admin.js'
 import { adminVerifiersRouter } from './routes/adminVerifiers.js'
 import { verificationsRouter } from './routes/verifications.js'
@@ -47,6 +48,7 @@ app.use('/api/analytics', analyticsRouter)
 app.use('/api/privacy', privacyRouter)
 app.use('/api/organizations', orgVaultsRouter)
 app.use('/api/organizations', orgAnalyticsRouter)
+app.use('/api/organizations', orgMembersRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/admin/verifiers', adminVerifiersRouter)
 app.use('/api/verifications', verificationsRouter)
