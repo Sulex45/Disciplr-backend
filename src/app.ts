@@ -1,25 +1,42 @@
 import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
+import { config } from './config/index.js'
 import { privacyLogger } from './middleware/privacy-logger.js'
 
 export const app = express()
 
 app.use(helmet())
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
+    // Non-browser / server-to-server requests carry no Origin header — pass through
+    if (!origin) {
+      callback(null, true)
+      return
+    }
+
+    const allowed = config.corsOrigins
+    if (allowed === '*' || (Array.isArray(allowed) && allowed.includes(origin))) {
+      callback(null, true)
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // Emit a structured log so rejected origins are observable in prod logs
+      console.log(
+        JSON.stringify({
+          level: 'warn',
+          event: 'security.cors_rejected',
+          service: 'disciplr-backend',
+          origin,
+          timestamp: new Date().toISOString(),
+        }),
+      )
+      callback(null, false)
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'idempotency-key'],
   credentials: true,
-};
+}
 
 app.use(cors(corsOptions))
 app.use(express.json())
