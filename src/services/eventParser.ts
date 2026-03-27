@@ -6,6 +6,8 @@ import {
   ValidationEventPayload 
 } from '../types/horizonSync'
 
+type DecodedPayload = Record<string, unknown>
+
 /**
  * Result of parsing a Horizon event
  */
@@ -36,6 +38,52 @@ export interface HorizonEvent {
   }
   inSuccessfulContractCall: boolean
   txHash: string
+}
+
+function decodePayloadRecord(xdrData: string): DecodedPayload | null {
+  const candidates = [xdrData]
+
+  try {
+    const decoded = Buffer.from(xdrData, 'base64').toString('utf8')
+    if (decoded && decoded !== xdrData) {
+      candidates.push(decoded)
+    }
+  } catch {
+    // Ignore invalid base64 and fall back to direct JSON parsing.
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as unknown
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as DecodedPayload
+      }
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  return null
+}
+
+function readStringField(record: DecodedPayload, key: string): string | undefined {
+  const value = record[key]
+  return typeof value === 'string' ? value : undefined
+}
+
+function readDateField(record: DecodedPayload, key: string): Date | undefined {
+  const value = record[key]
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed
+  }
+
+  return undefined
 }
 
 /**
@@ -115,57 +163,57 @@ function parseVaultPayload(
   eventType: EventType,
   xdrData: string
 ): VaultEventPayload | null {
-  try {
-    // TODO: Implement full XDR decoding using Stellar SDK
-    // For now, return a minimal payload structure based on event type
-    
-    // Extract vault ID from XDR (placeholder implementation)
-    const vaultId = `vault_${Date.now()}`
-    
-    let payload: VaultEventPayload
-    
-    switch (eventType) {
-      case 'vault_created':
-        payload = {
-          vaultId,
-          creator: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-          amount: '1000.0000000',
-          startTimestamp: new Date(),
-          endTimestamp: new Date(Date.now() + 86400000), // +1 day
-          successDestination: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-          failureDestination: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-          status: 'active'
-        }
-        
-        // Validate vault_created payload
+  const decoded = decodePayloadRecord(xdrData)
+  if (!decoded) {
+    return null
+  }
+
+  let payload: VaultEventPayload
+
+  switch (eventType) {
+    case 'vault_created':
+      payload = {
+        vaultId: readStringField(decoded, 'vaultId') ?? '',
+        creator: readStringField(decoded, 'creator'),
+        amount: readStringField(decoded, 'amount'),
+        startTimestamp: readDateField(decoded, 'startTimestamp'),
+        endTimestamp: readDateField(decoded, 'endTimestamp'),
+        successDestination: readStringField(decoded, 'successDestination'),
+        failureDestination: readStringField(decoded, 'failureDestination'),
+        status: (readStringField(decoded, 'status') as VaultEventPayload['status']) ?? 'active'
+      }
+
+      {
         const createdError = validateVaultCreatedPayload(payload)
         if (createdError) {
           console.error(`Vault created validation error: ${createdError}`)
           return null
         }
-        return payload
-      
-      case 'vault_completed':
-      case 'vault_failed':
-      case 'vault_cancelled':
-        payload = {
-          vaultId,
-          status: eventType.replace('vault_', '') as 'completed' | 'failed' | 'cancelled'
-        }
-        
-        // Validate vault status payload
+      }
+
+      return payload
+
+    case 'vault_completed':
+    case 'vault_failed':
+    case 'vault_cancelled':
+      payload = {
+        vaultId: readStringField(decoded, 'vaultId') ?? '',
+        status: ((readStringField(decoded, 'status') ??
+          eventType.replace('vault_', '')) as VaultEventPayload['status'])
+      }
+
+      {
         const statusError = validateVaultStatusPayload(payload)
         if (statusError) {
           console.error(`Vault status validation error: ${statusError}`)
           return null
         }
-        return payload
-      
-      default:
-        return null
-    }
-  } catch (error) {
-    return null
+      }
+
+      return payload
+
+    default:
+      return null
   }
 }
 
@@ -216,30 +264,27 @@ function validateMilestonePayload(payload: MilestoneEventPayload): string | null
  * @returns MilestoneEventPayload or null if parsing fails
  */
 function parseMilestonePayload(xdrData: string): MilestoneEventPayload | null {
-  try {
-    // TODO: Implement full XDR decoding using Stellar SDK
-    // For now, return a minimal payload structure
-    
-    const payload: MilestoneEventPayload = {
-      milestoneId: `milestone_${Date.now()}`,
-      vaultId: `vault_${Date.now()}`,
-      title: 'Milestone Title',
-      description: 'Milestone Description',
-      targetAmount: '500.0000000',
-      deadline: new Date(Date.now() + 86400000) // +1 day
-    }
-    
-    // Validate milestone payload
-    const error = validateMilestonePayload(payload)
-    if (error) {
-      console.error(`Milestone validation error: ${error}`)
-      return null
-    }
-    
-    return payload
-  } catch (error) {
+  const decoded = decodePayloadRecord(xdrData)
+  if (!decoded) {
     return null
   }
+
+  const payload: MilestoneEventPayload = {
+    milestoneId: readStringField(decoded, 'milestoneId') ?? '',
+    vaultId: readStringField(decoded, 'vaultId') ?? '',
+    title: readStringField(decoded, 'title') ?? '',
+    description: readStringField(decoded, 'description') ?? '',
+    targetAmount: readStringField(decoded, 'targetAmount') ?? '',
+    deadline: readDateField(decoded, 'deadline') ?? new Date('invalid')
+  }
+
+  const error = validateMilestonePayload(payload)
+  if (error) {
+    console.error(`Milestone validation error: ${error}`)
+    return null
+  }
+
+  return payload
 }
 
 /**
@@ -289,30 +334,27 @@ function validateValidationPayload(payload: ValidationEventPayload): string | nu
  * @returns ValidationEventPayload or null if parsing fails
  */
 function parseValidationPayload(xdrData: string): ValidationEventPayload | null {
-  try {
-    // TODO: Implement full XDR decoding using Stellar SDK
-    // For now, return a minimal payload structure
-    
-    const payload: ValidationEventPayload = {
-      validationId: `validation_${Date.now()}`,
-      milestoneId: `milestone_${Date.now()}`,
-      validatorAddress: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-      validationResult: 'approved',
-      evidenceHash: 'hash_' + Date.now(),
-      validatedAt: new Date()
-    }
-    
-    // Validate validation payload
-    const error = validateValidationPayload(payload)
-    if (error) {
-      console.error(`Validation event validation error: ${error}`)
-      return null
-    }
-    
-    return payload
-  } catch (error) {
+  const decoded = decodePayloadRecord(xdrData)
+  if (!decoded) {
     return null
   }
+
+  const payload: ValidationEventPayload = {
+    validationId: readStringField(decoded, 'validationId') ?? '',
+    milestoneId: readStringField(decoded, 'milestoneId') ?? '',
+    validatorAddress: readStringField(decoded, 'validatorAddress') ?? '',
+    validationResult: (readStringField(decoded, 'validationResult') as ValidationEventPayload['validationResult']) ?? 'approved',
+    evidenceHash: readStringField(decoded, 'evidenceHash') ?? '',
+    validatedAt: readDateField(decoded, 'validatedAt') ?? new Date('invalid')
+  }
+
+  const error = validateValidationPayload(payload)
+  if (error) {
+    console.error(`Validation event validation error: ${error}`)
+    return null
+  }
+
+  return payload
 }
 
 /**
