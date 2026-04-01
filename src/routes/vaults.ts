@@ -143,7 +143,6 @@ vaultsRouter.get('/:id', authenticate, async (req: Request, res: Response) => {
     res.status(404).json({ error: 'Vault not found' })
     return
   }
-  res.json(vault)
 })
 
 // ─── POST /api/vaults/:id/cancel ─────────────────────────────────────────────

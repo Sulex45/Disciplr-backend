@@ -29,55 +29,17 @@ export class VaultService {
       console.error('Error creating vault:', error);
       throw new Error('Database error during vault creation');
     }
-  }
+}
 
-  /**
-   * Retrieves a vault by its internal UUID.
-   */
-  static async getVaultById(id: string): Promise<Vault | null> {
-    const query = `SELECT * FROM vaults WHERE id = $1;`;
-    
-    try {
-      const result = await pool.query(query, [id]);
-      return result.rows.length ? result.rows[0] : null;
-    } catch (error) {
-      console.error(`Error fetching vault with id ${id}:`, error);
-      throw new Error('Database error during fetch');
+// Use Prisma only when DATABASE_URL is available
+let prisma: any
+try {
+    if (process.env.DATABASE_URL) {
+        const { prisma: realPrisma } = await import('../lib/prisma.js')
+        prisma = realPrisma
+    } else {
+        prisma = mockPrisma
     }
-  }
-
-  /**
-   * Retrieves all vaults created by a specific Stellar address.
-   */
-  static async getVaultsByUser(creatorAddress: string): Promise<Vault[]> {
-    const query = `SELECT * FROM vaults WHERE creator_address = $1 ORDER BY created_at DESC;`;
-    
-    try {
-      const result = await pool.query(query, [creatorAddress]);
-      return result.rows;
-    } catch (error) {
-      console.error(`Error fetching vaults for user ${creatorAddress}:`, error);
-      throw new Error('Database error during fetch');
-    }
-  }
-
-  /**
-   * Updates the status of an existing vault.
-   */
-  static async updateVaultStatus(id: string, status: VaultStatus): Promise<Vault | null> {
-    const query = `
-      UPDATE vaults 
-      SET status = $1, updated_at = NOW() 
-      WHERE id = $2 
-      RETURNING *;
-    `;
-    
-    try {
-      const result = await pool.query(query, [status, id]);
-      return result.rows.length ? result.rows[0] : null;
-    } catch (error) {
-      console.error(`Error updating vault status for id ${id}:`, error);
-      throw new Error('Database error during status update');
-    }
-  }
+} catch {
+    prisma = mockPrisma
 }
