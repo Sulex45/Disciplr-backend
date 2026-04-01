@@ -16,6 +16,7 @@ export interface HorizonListenerConfig {
   retryMaxAttempts: number
   retryBackoffMs: number
   shutdownTimeoutMs: number
+  lagThreshold: number
 }
 
 function parseNonNegativeInteger(value: string | undefined, fallback?: number): number | undefined {
@@ -38,6 +39,7 @@ export function loadHorizonListenerConfig(): HorizonListenerConfig {
   const startLedgerRaw = process.env.START_LEDGER
   const retryMaxAttemptsRaw = process.env.RETRY_MAX_ATTEMPTS
   const retryBackoffMsRaw = process.env.RETRY_BACKOFF_MS
+  const lagThresholdRaw = process.env.HORIZON_LAG_THRESHOLD
 
   // Parse CONTRACT_ADDRESS as comma-separated list
   const contractAddresses = contractAddressRaw
@@ -57,6 +59,7 @@ export function loadHorizonListenerConfig(): HorizonListenerConfig {
     retryMaxAttempts,
     retryBackoffMs,
     shutdownTimeoutMs,
+    lagThreshold,
   }
 }
 
@@ -87,6 +90,10 @@ export function validateHorizonListenerConfig(config: HorizonListenerConfig): vo
 
   if (isNaN(config.retryBackoffMs) || config.retryBackoffMs < 0) {
     errors.push('RETRY_BACKOFF_MS must be a non-negative number')
+  }
+
+  if (isNaN(config.lagThreshold) || config.lagThreshold < 0) {
+    errors.push('HORIZON_LAG_THRESHOLD must be a non-negative number')
   }
 
   // If validation fails, log errors and exit
