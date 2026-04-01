@@ -1,5 +1,4 @@
-import { ParsedEvent } from '../../types/horizonSync'
-import { HorizonEvent } from '../../services/eventParser'
+import { ParsedEvent } from '../../types/horizonSync.js'
 
 /**
  * Mocked Horizon event fixtures for testing
