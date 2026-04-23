@@ -49,6 +49,10 @@ authRouter.post('/register', async (req, res) => {
         const user = await AuthService.register(result.data)
         res.status(201).json(user)
     } catch (error: any) {
+        if (error.message === 'Email already in use') {
+            res.status(409).json({ error: error.message })
+            return
+        }
         res.status(400).json({ error: error.message })
     }
 })
