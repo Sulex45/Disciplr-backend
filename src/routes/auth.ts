@@ -3,6 +3,7 @@ import { AuthService } from '../services/auth.service.js'
 import { registerSchema, loginSchema, refreshSchema } from '../lib/validation.js'
 import { createAuditLog } from '../lib/audit-logs.js'
 import { authenticate } from '../middleware/auth.js'
+import { loginRateLimiter } from '../middleware/rateLimiter.js'
 import { revokeSession, revokeAllUserSessions } from '../services/session.js'
 
 export const authRouter = Router()
@@ -53,7 +54,7 @@ authRouter.post('/register', async (req, res) => {
     }
 })
 
-authRouter.post('/login', async (req, res) => {
+authRouter.post('/login', loginRateLimiter, async (req, res) => {
     // Support mock login if only userId is provided (from audit-logs feature branch)
     if (req.body.userId && !req.body.email && !req.body.password) {
         const { userId } = req.body as { userId: string }
