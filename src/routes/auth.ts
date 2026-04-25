@@ -3,7 +3,7 @@ import { AuthService } from '../services/auth.service.js'
 import { registerSchema, loginSchema, refreshSchema } from '../lib/validation.js'
 import { createAuditLog } from '../lib/audit-logs.js'
 import { authenticate } from '../middleware/auth.js'
-import { revokeSession, revokeAllUserSessions } from '../services/session.js'
+import { revokeSession } from '../services/session.js'
 
 export const authRouter = Router()
 
@@ -138,7 +138,8 @@ authRouter.post('/logout-all', authenticate, async (req: Request, res: Response)
     return
   }
 
-  await revokeAllUserSessions(userId)
+  // Revoke ALL refresh tokens AND access token sessions for this user
+  await AuthService.logoutAll(userId)
   res.json({ message: 'Successfully logged out from all devices' })
 })
 
