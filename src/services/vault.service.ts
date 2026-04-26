@@ -41,3 +41,5 @@ export class VaultService {
     return null
   }
 }
+
+export { prisma }
