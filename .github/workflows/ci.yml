@@ -79,3 +79,8 @@ jobs:
           mkdir -p reports
           npm audit --json > reports/npm-audit.json
         continue-on-error: true
+      - name: Generate OpenAPI spec
+        run: npm run openapi:generate
+
+      - name: Validate OpenAPI spec
+        run: npm run openapi:validate
