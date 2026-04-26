@@ -121,6 +121,7 @@ curl -X POST http://localhost:3000/api/jobs/enqueue \
 - `ENABLE_JOB_SCHEDULER` (`false` disables recurring jobs)
 - `DEADLINE_CHECK_INTERVAL_MS` (default: `60000`)
 - `ANALYTICS_RECOMPUTE_INTERVAL_MS` (default: `300000`)
+- `MAX_JSON_BODY_SIZE` (default: `500kb`)
 
 ### Example: create a vault
 - Node.js + TypeScript
