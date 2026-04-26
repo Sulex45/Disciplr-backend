@@ -7,8 +7,21 @@ initEnv()
 import { app } from './app.js'
 import { bootstrapApp } from './app-bootstrap.js'
 import { startExpirationChecker } from './services/expirationScheduler.js'
-import { initializeDatabase } from './db/database.js'
+import { orgVaultsRouter } from './routes/orgVaults.js'
+import { orgAnalyticsRouter } from './routes/orgAnalytics.js'
+import { orgMembersRouter } from './routes/orgMembers.js'
+import { adminRouter } from './routes/admin.js'
+import { adminVerifiersRouter } from './routes/adminVerifiers.js'
+import { verificationsRouter } from './routes/verifications.js'
+import { apiKeysRouter } from './routes/apiKeys.js'
+import { notificationsRouter } from './routes/notifications.js'
+import {
+  securityMetricsMiddleware,
+  securityRateLimitMiddleware,
+} from './security/abuse-monitor.js'
+import { initializeDatabase, closeDatabase } from './db/database.js'
 import { etlWorker } from './services/etlWorker.js'
+import { createShutdownHandler } from './server/shutdown.js'
 
 const PORT = process.env.PORT ?? 3000
 
@@ -29,37 +42,15 @@ const server = app.listen(PORT, () => {
   }
 })
 
-let shuttingDown = false
-
-const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
-  if (shuttingDown) {
-    return
-  }
-
-  shuttingDown = true
-  console.log(`Received ${signal}. Shutting down gracefully...`)
-
-  try {
-    await etlWorker.stop()
-    await jobSystem.stop()
-    await new Promise<void>((resolve, reject) => {
-      server.close((error) => {
-        if (error) {
-          reject(error)
-          return
-        }
-        resolve()
-      })
-    })
-    process.exit(0)
-  } catch (error) {
-    console.error('Failed during shutdown:', error)
-    process.exit(1)
-  }
-}
+const shutdownHandler = createShutdownHandler({
+  server,
+  jobSystem,
+  etlWorker,
+  closeDb: closeDatabase,
+})
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
-    void shutdown(signal)
+    void shutdownHandler(signal)
   })
 }

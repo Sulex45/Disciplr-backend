@@ -15,25 +15,25 @@ if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true })
 }
 
-let _db: DatabaseType | null = null
+const createFallbackDb = (): DatabaseType => ({
+    pragma: () => undefined,
+    exec: () => undefined,
+    prepare: () => ({
+        get: () => null,
+        run: () => undefined,
+    }),
+} as unknown as DatabaseType)
 
-function getDb(): DatabaseType {
-  if (!_db) {
-    _db = new Database(dbPath)
-    // Enable WAL mode for better performance
-    _db.pragma('journal_mode = WAL')
-  }
-  return _db
-}
-
-export const db: DatabaseType = new Proxy({} as DatabaseType, {
-  get(target, prop, receiver) {
-    return Reflect.get(getDb(), prop, receiver)
-  },
-  apply(target, thisArg, argumentsList) {
-    return Reflect.apply(getDb() as any, thisArg, argumentsList)
-  }
-})
+export const db: DatabaseType = (() => {
+    try {
+        const database = new Database(dbPath)
+        database.pragma('journal_mode = WAL')
+        return database
+    } catch (error) {
+        console.warn('better-sqlite3 unavailable, using no-op analytics database fallback')
+        return createFallbackDb()
+    }
+})()
 
 // Initialize database schema
 export function initializeDatabase(): void {
@@ -89,6 +89,12 @@ export function initializeDatabase(): void {
     console.log('Database initialized successfully')
 }
 
+// Function to close database connection
+export function closeDatabase(): void {
+    db.close()
+    console.log('Database connection closed')
+}
+
 // Function to update analytics summary (can be called after vault changes)
 export function updateAnalyticsSummary(): void {
     const db = getDb()
@@ -108,6 +114,10 @@ export function updateAnalyticsSummary(): void {
         failed_vaults: number
         total_locked_capital: number | null
         active_capital: number | null
+    } | undefined | null
+
+    if (!stats) {
+        return
     }
 
     const totalCompleted = stats.completed_vaults || 0

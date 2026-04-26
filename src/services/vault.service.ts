@@ -1,6 +1,4 @@
-import { Vault, CreateVaultDTO, VaultStatus } from '../types/vault.js';
-
-// Assuming you have a configured pg pool exported from your db setup
+import { Vault, CreateVaultDTO } from '../types/vault.js';
 import pool from '../db/index.js'; 
 
 export class VaultService {
@@ -30,21 +28,18 @@ export class VaultService {
       throw new Error('Database error during vault creation');
     }
   }
-}
 
-const mockPrisma = {} as any
-
-// Use Prisma only when DATABASE_URL is available
-let prisma: any
-if (process.env.DATABASE_URL) {
+  static async initializePrisma() {
     try {
-        const { prisma: realPrisma } = await import('../lib/prisma.js')
-        prisma = realPrisma
+      if (process.env.DATABASE_URL) {
+        const { prisma } = await import('../lib/prisma.js')
+        return prisma
+      }
     } catch {
-        prisma = mockPrisma
+      console.warn('Prisma initialization failed, falling back to null')
     }
-} else {
-    prisma = mockPrisma
+    return null
+  }
 }
 
 export { prisma }
