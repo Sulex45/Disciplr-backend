@@ -5,6 +5,7 @@ type AppConfig = {
   port: number
   serviceName: string
   corsOrigins: string[] | '*'
+  maxJsonBodySize: string
 }
 
 /**
@@ -96,4 +97,5 @@ export const config: AppConfig = {
     _validated?.CORS_ORIGINS ?? process.env.CORS_ORIGINS,
     _env,
   ),
+  maxJsonBodySize: _validated?.MAX_JSON_BODY_SIZE ?? process.env.MAX_JSON_BODY_SIZE ?? '500kb',
 }
